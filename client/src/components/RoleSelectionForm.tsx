@@ -19,7 +19,6 @@ const roles = [
 ];
 
 const RoleSelectionForm: React.FC = () => {
-  // Using a signal for state management for optimal performance.
   const selectedRole = useSignal<string>("");
 
   const handleRoleChange = (value: string) => {
