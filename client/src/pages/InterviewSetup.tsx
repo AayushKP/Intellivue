@@ -58,15 +58,6 @@ const InterviewSetup: React.FC = () => {
   const error = useSignal<string>("");
   const navigate = useNavigate();
 
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  // Handle PDF file selection
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setResumeFile(e.target.files[0]);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -94,11 +85,6 @@ const InterviewSetup: React.FC = () => {
         formData.append("technologies[]", tech)
       );
       formData.append("targetCompany", targetCompany.value);
-
-      // Append PDF file if selected
-      if (resumeFile) {
-        formData.append("resume", resumeFile);
-      }
 
       const response = await axios.post(
         "http://localhost:3000/api/gemini",
