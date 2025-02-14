@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { useSignal } from "@preact/signals-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -10,7 +10,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Card,
   CardHeader,
@@ -18,8 +17,8 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
 
+// Example data
 const roles = [
   "Software Engineer",
   "Backend Engineer",
@@ -40,46 +39,78 @@ const technologiesList = [
   "PostgreSQL",
   "Docker",
 ];
+// Example list of companies for the “Select Company” dropdown
+const companies = ["Google", "Amazon", "Microsoft", "Apple", "Netflix"];
 
 const InterviewSetup: React.FC = () => {
+  // Using signals for simple fields
   const selectedRole = useSignal<string>("");
   const selectedLevel = useSignal<string>("");
   const selectedExperience = useSignal<string>("");
+  const targetCompany = useSignal<string>("");
+
+  // Using state for multi-select and file uploads
   const [selectedTechnologies, setSelectedTechnologies] = useState<string[]>(
     []
   );
-  const targetCompany = useSignal<string>("");
-  const resumeText = useSignal<string>("");
 
   const loading = useSignal<boolean>(false);
   const error = useSignal<string>("");
   const navigate = useNavigate();
 
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Handle PDF file selection
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setResumeFile(e.target.files[0]);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Basic client-side validation
     if (
       !selectedRole.value ||
       !selectedLevel.value ||
       !selectedExperience.value ||
       selectedTechnologies.length === 0
     ) {
-      return (error.value = "Please fill all fields.");
+      error.value = "Please fill all fields.";
+      return;
     }
 
-    loading.value = true;
     error.value = "";
+    loading.value = true;
 
     try {
-      const response = await axios.post("http://localhost:3000/api/gemini", {
-        role: selectedRole.value,
-        level: selectedLevel.value,
-        experience: selectedExperience.value,
-        technologies: selectedTechnologies,
-        targetCompany: targetCompany.value,
-        resumeText: resumeText.value,
-      });
+      // Use FormData for file upload
+      const formData = new FormData();
+      formData.append("role", selectedRole.value);
+      formData.append("level", selectedLevel.value);
+      formData.append("experience", selectedExperience.value);
+      selectedTechnologies.forEach((tech) =>
+        formData.append("technologies[]", tech)
+      );
+      formData.append("targetCompany", targetCompany.value);
 
+      // Append PDF file if selected
+      if (resumeFile) {
+        formData.append("resume", resumeFile);
+      }
+
+      const response = await axios.post(
+        "http://localhost:3000/api/gemini",
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
+
+      // Save questions to localStorage (as before)
       localStorage.setItem("questions", response.data.questions);
+
       navigate("/interview");
     } catch (err) {
       console.error(err);
@@ -90,30 +121,26 @@ const InterviewSetup: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-12">
-      <div className="container mx-auto max-w-4xl px-4">
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-3xl font-bold text-gray-900">
-              Interview Setup
-            </CardTitle>
-            <CardDescription className="text-gray-600">
-              Fill in the details to generate tailored interview questions.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Role Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Your Role:
-                </label>
+    // Dark background to replicate the modal-like style
+    <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center p-4">
+      <Card className="max-w-lg w-full bg-neutral-900 text-white">
+        <CardHeader>
+          <CardTitle className="text-xl font-bold">Interview Setup</CardTitle>
+          <CardDescription>Customize your practice interview</CardDescription>
+        </CardHeader>
+
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="flex gap-4">
+              {/* Role */}
+              <div className="flex-1">
+                <label className="block text-sm font-medium mb-1">Role</label>
                 <Select
                   onValueChange={(value) => (selectedRole.value = value)}
                   value={selectedRole.value}
                 >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a role" />
+                  <SelectTrigger className="w-full bg-neutral-800">
+                    <SelectValue placeholder="Select Role" />
                   </SelectTrigger>
                   <SelectContent>
                     {roles.map((role) => (
@@ -125,17 +152,15 @@ const InterviewSetup: React.FC = () => {
                 </Select>
               </div>
 
-              {/* Level Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Experience Level:
-                </label>
+              {/* Level */}
+              <div className="flex-1">
+                <label className="block text-sm font-medium mb-1">Level</label>
                 <Select
                   onValueChange={(value) => (selectedLevel.value = value)}
                   value={selectedLevel.value}
                 >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a level" />
+                  <SelectTrigger className="w-full bg-neutral-800">
+                    <SelectValue placeholder="Select Level" />
                   </SelectTrigger>
                   <SelectContent>
                     {levels.map((level) => (
@@ -146,96 +171,119 @@ const InterviewSetup: React.FC = () => {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
 
-              {/* Experience Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Years of Experience:
-                </label>
-                <Select
-                  onValueChange={(value) => (selectedExperience.value = value)}
-                  value={selectedExperience.value}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select experience" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {experiences.map((exp) => (
-                      <SelectItem key={exp} value={exp}>
-                        {exp}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Technologies Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Technologies You Know:
-                </label>
-                <Select
-                  onValueChange={(value) => setSelectedTechnologies([value])}
-                  value={selectedTechnologies[0] || ""}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a technology" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {technologiesList.map((tech) => (
-                      <SelectItem key={tech} value={tech}>
-                        {tech}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Target Company Input */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Target Company (Optional):
-                </label>
-                <Input
-                  type="text"
-                  placeholder="Enter company name"
-                  value={targetCompany.value}
-                  onChange={(e: any) => (targetCompany.value = e.target.value)}
-                  className="w-full"
-                />
-              </div>
-
-              {/* Resume Text Input */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Paste Your Resume Text (Optional):
-                </label>
-                <Textarea
-                  placeholder="Paste your resume text here..."
-                  value={resumeText.value}
-                  onChange={(e) => (resumeText.value = e.target.value)}
-                  className="w-full"
-                  rows={4}
-                />
-              </div>
-
-              {/* Error Message */}
-              {error.value && (
-                <p className="text-sm text-red-600">{error.value}</p>
-              )}
-
-              {/* Submit Button */}
-              <Button
-                type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700"
-                disabled={loading.value}
+            {/* Experience */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Experience (years)
+              </label>
+              <Select
+                onValueChange={(value) => (selectedExperience.value = value)}
+                value={selectedExperience.value}
               >
-                {loading.value ? "Generating..." : "Start Interview"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
+                <SelectTrigger className="w-full bg-neutral-800">
+                  <SelectValue placeholder="Select years of experience" />
+                </SelectTrigger>
+                <SelectContent>
+                  {experiences.map((exp) => (
+                    <SelectItem key={exp} value={exp}>
+                      {exp}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Technologies */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Technologies
+              </label>
+              <Select
+                onValueChange={(value) => {
+                  setSelectedTechnologies((prev) =>
+                    prev.includes(value)
+                      ? prev.filter((tech) => tech !== value)
+                      : [...prev, value]
+                  );
+                }}
+              >
+                <SelectTrigger className="w-full bg-neutral-800">
+                  <SelectValue placeholder="Select technologies" />
+                </SelectTrigger>
+                <SelectContent>
+                  {technologiesList.map((tech) => (
+                    <SelectItem key={tech} value={tech}>
+                      {tech} {selectedTechnologies.includes(tech) ? "✔️" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {/* Display selected technologies */}
+              {selectedTechnologies.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {selectedTechnologies.map((tech) => (
+                    <span
+                      key={tech}
+                      className="bg-neutral-700 rounded px-2 py-1 text-sm flex items-center"
+                    >
+                      {tech}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSelectedTechnologies((prev) =>
+                            prev.filter((t) => t !== tech)
+                          )
+                        }
+                        className="ml-2 text-red-400"
+                      >
+                        x
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Target Company */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Target Company
+              </label>
+              <Select
+                onValueChange={(value) => (targetCompany.value = value)}
+                value={targetCompany.value}
+              >
+                <SelectTrigger className="w-full bg-neutral-800">
+                  <SelectValue placeholder="Select Company" />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((company) => (
+                    <SelectItem key={company} value={company}>
+                      {company}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Error message */}
+            {error.value && (
+              <p className="text-sm text-red-400">{error.value}</p>
+            )}
+
+            {/* Submit button */}
+            <Button
+              type="submit"
+              className="w-full bg-blue-600 hover:bg-blue-700"
+              disabled={loading.value}
+            >
+              {loading.value ? "Generating..." : "Generate Interview Questions"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 };
