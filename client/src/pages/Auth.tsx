@@ -18,7 +18,6 @@ function Auth() {
   const [loginLoading, setLoginLoading] = useState<boolean>(false);
   const [signupLoading, setSignupLoading] = useState<boolean>(false);
 
-  // Email validation function
   const isValidEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
@@ -61,7 +60,7 @@ function Auth() {
     setLoginLoading(true);
     try {
       const res = await apiClient.post(
-        LOGIN_ROUTE,
+        `${BACKEND_URL}/login`,
         { email, password },
         { withCredentials: true }
       );
@@ -82,7 +81,7 @@ function Auth() {
     setSignupLoading(true);
     try {
       const res = await apiClient.post(
-        SIGNUP_ROUTE,
+        `{ BACKEND_URL }/signup`,
         { email, password },
         { withCredentials: true }
       );
